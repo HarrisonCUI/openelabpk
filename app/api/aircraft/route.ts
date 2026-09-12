@@ -21,23 +21,6 @@ type OpenSkyState = [
 
 type OpenSkyResponse = { time: number; states: OpenSkyState[] | null };
 
-type AdsbLolAircraft = {
-  hex?: string;
-  flight?: string;
-  lat?: number;
-  lon?: number;
-  alt_baro?: number | 'ground';
-  alt_geom?: number;
-  gs?: number;
-  track?: number;
-  baro_rate?: number;
-};
-
-type AdsbLolResponse = {
-  ac?: AdsbLolAircraft[];
-  now?: number;
-};
-
 type NormalizedAircraft = {
   icao24: string;
   callsign: string | null;
@@ -284,7 +267,7 @@ export async function GET(request: Request) {
           accept: 'application/json',
           'user-agent': 'Overhead-Aircraft-Radar/1.0',
         },
-        signal: AbortSignal.timeout(3500),
+        signal: AbortSignal.timeout(2000),
       },
     );
     if (!upstream.ok) throw new Error(`OpenSky ${upstream.status}`);
@@ -314,88 +297,7 @@ export async function GET(request: Request) {
         };
       });
   } catch {
-    const nauticalMiles = Math.min(250, Math.ceil(searchRadius / 1.852));
-    const providers = [
-      {
-        name: 'ADSB.lol',
-        url: `https://api.adsb.lol/v2/point/${lat}/${lon}/${nauticalMiles}`,
-      },
-      {
-        name: 'ADSB.fi',
-        url: `https://opendata.adsb.fi/api/v3/lat/${lat}/lon/${lon}/dist/${nauticalMiles}`,
-        wrapped: false,
-      },
-      {
-        name: 'ADSB.fi · Jina',
-        url: `https://r.jina.ai/http://opendata.adsb.fi/api/v3/lat/${lat}/lon/${lon}/dist/${nauticalMiles}?minute=${Math.floor(Date.now() / 60_000)}`,
-        wrapped: true,
-      },
-    ];
-    let data: AdsbLolResponse | null = null;
-
-    for (const provider of providers) {
-      try {
-        const fallback = await fetch(provider.url, {
-          headers: { accept: 'application/json' },
-          signal: AbortSignal.timeout(4500),
-        });
-        if (!fallback.ok) continue;
-        if (provider.wrapped) {
-          const content = await fallback.text();
-          const start = content.indexOf('{"ac"');
-          const end = content.lastIndexOf('}');
-          if (start < 0 || end <= start) continue;
-          data = JSON.parse(content.slice(start, end + 1)) as AdsbLolResponse;
-        } else {
-          data = (await fallback.json()) as AdsbLolResponse;
-        }
-        source = provider.name;
-        break;
-      } catch {
-        // Try the next public ADS-B provider.
-      }
-    }
-
-    if (!data) {
-      return json({ error: '实时航班数据源暂时不可用，请稍后重试。' }, 502);
-    }
-
-    dataTime = data.now ? Math.floor(data.now / 1000) : dataTime;
-    allAircraft = (data.ac ?? [])
-      .filter(
-        (item) =>
-          typeof item.lat === 'number' &&
-          typeof item.lon === 'number' &&
-          item.alt_baro !== 'ground',
-      )
-      .map((item) => {
-        const latitude = item.lat as number;
-        const longitude = item.lon as number;
-        const position = distanceAndBearing(lat, lon, latitude, longitude);
-        const altitudeFeet =
-          typeof item.alt_geom === 'number'
-            ? item.alt_geom
-            : typeof item.alt_baro === 'number'
-              ? item.alt_baro
-              : null;
-        return {
-          icao24: item.hex || 'unknown',
-          callsign: item.flight?.trim() || null,
-          country: '实时 ADS-B',
-          longitude,
-          latitude,
-          altitude: altitudeFeet === null ? null : altitudeFeet * 0.3048,
-          velocity: typeof item.gs === 'number' ? item.gs * 0.514444 : null,
-          track: typeof item.track === 'number' ? item.track : null,
-          verticalRate:
-            typeof item.baro_rate === 'number'
-              ? item.baro_rate * 0.00508
-              : null,
-          category: null,
-          distance: position.distance,
-          bearing: position.bearing,
-        };
-      });
+    return json({ error: '暂时连接不上 OpenSky，请稍后再试。' }, 502);
   }
   const aircraft = allAircraft
     .filter((item) => item.distance <= radius)
