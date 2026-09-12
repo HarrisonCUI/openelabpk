@@ -81,6 +81,15 @@ const DEFAULT_POSITION: Coordinates = { lat: 22.5431, lon: 114.0579 };
 const DEFAULT_LOCATION_LABEL = '默认位置 · 深圳';
 const GITHUB_PAGES_API =
   'https://overhead-aircraft-radar.wizardofozai.chatgpt.site/api/aircraft';
+const SHENZHEN_SNAPSHOT =
+  'https://raw.githubusercontent.com/HarrisonCUI/openelabpk/live-data/shenzhen.json';
+
+function isShenzhenFallback(position: Coordinates) {
+  return (
+    Math.abs(position.lat - DEFAULT_POSITION.lat) < 0.000_001 &&
+    Math.abs(position.lon - DEFAULT_POSITION.lon) < 0.000_001
+  );
+}
 
 function aircraftApiUrl(params: URLSearchParams) {
   const endpoint = window.location.hostname.endsWith('github.io')
@@ -210,6 +219,26 @@ export default function Home() {
         }
         return nextResult;
       } catch (error) {
+        if (isShenzhenFallback(target)) {
+          try {
+            const snapshotResponse = await fetch(
+              `${SHENZHEN_SNAPSHOT}?v=${Math.floor(Date.now() / 300_000)}`,
+              { cache: 'no-store' },
+            );
+            if (!snapshotResponse.ok) throw new Error('深圳快照暂时不可用。');
+            const snapshot = (await snapshotResponse.json()) as ScanResult;
+            setResult(snapshot);
+            setStatus('ready');
+            setMessage(
+              snapshot.aircraft.length
+                ? `深圳附近有 ${snapshot.aircraft.length} 架飞机（定时快照）`
+                : '深圳 35 公里内暂时没有收到飞机信号',
+            );
+            return snapshot;
+          } catch {
+            // Continue to the normal error state when no snapshot is available.
+          }
+        }
         setStatus('error');
         setMessage(
           error instanceof Error ? error.message : '查询失败，请稍后重试。',
