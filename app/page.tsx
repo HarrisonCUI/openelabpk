@@ -71,8 +71,9 @@ function formatHeading(degrees: number | null) {
   return `${points[Math.round(degrees / 45) % 8]} · ${Math.round(degrees)}°`;
 }
 
-function formatClock(timestamp: number | null) {
-  const date = timestamp ? new Date(timestamp * 1000) : new Date();
+function formatClock(value: number | Date | null) {
+  if (value === null) return '--:--';
+  const date = value instanceof Date ? value : new Date(value * 1000);
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
@@ -80,7 +81,8 @@ function formatClock(timestamp: number | null) {
   }).format(date);
 }
 
-function formatDate(date: Date) {
+function formatDate(date: Date | null) {
+  if (!date) return '等待时间同步';
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
     day: 'numeric',
@@ -103,7 +105,7 @@ export default function Home() {
   const [message, setMessage] = useState(
     '设置一次位置，这块电子纸就能持续显示头顶航班。',
   );
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   const scan = useCallback(
     async (coords?: Coordinates, radiusOverride?: number) => {
@@ -183,11 +185,15 @@ export default function Home() {
   }, [radius, scan]);
 
   useEffect(() => {
+    setNow(new Date());
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     const params = new URLSearchParams(window.location.search);
-    const queryLat = Number(params.get('lat'));
-    const queryLon = Number(params.get('lon'));
-    const queryRadius = Number(params.get('radius'));
+    const latParam = params.get('lat');
+    const lonParam = params.get('lon');
+    const radiusParam = params.get('radius');
+    const queryLat = latParam === null ? Number.NaN : Number(latParam);
+    const queryLon = lonParam === null ? Number.NaN : Number(lonParam);
+    const queryRadius = radiusParam === null ? Number.NaN : Number(radiusParam);
     let initial: Coordinates | null = null;
 
     if (
@@ -336,7 +342,7 @@ export default function Home() {
             </div>
           </div>
           <div className="date-block">
-            <strong>{formatClock(result?.timestamp ?? null)}</strong>
+            <strong>{formatClock(result?.timestamp ?? now)}</strong>
             <span>{formatDate(now)}</span>
           </div>
         </header>
