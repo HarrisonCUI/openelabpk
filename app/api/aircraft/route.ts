@@ -227,7 +227,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const searchRadius = flight ? 500 : radius;
+  const searchRadius = flight ? 250 : radius;
   const latDelta = searchRadius / 111;
   const lonDelta =
     searchRadius / Math.max(111 * Math.cos(toRadians(roundedLat)), 10);

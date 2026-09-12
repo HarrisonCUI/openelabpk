@@ -139,7 +139,7 @@ function predictionTitle(prediction: Prediction | null) {
 }
 
 function predictionDetail(prediction: Prediction | null) {
-  if (!prediction) return '航班进入约 500 公里实时空域后显示';
+  if (!prediction) return '航班进入约 250 公里实时空域后显示';
   if (prediction.status === 'moving_away') return '可继续观察下一次实时更新';
   if (prediction.status === 'insufficient_data')
     return 'OpenSky 暂未提供足够的速度或航向';
@@ -588,7 +588,7 @@ export default function Home() {
               <small>
                 {result?.target
                   ? predictionDetail(result.prediction)
-                  : '可能尚未起飞，或不在约 500 公里实时覆盖内'}
+                  : '可能尚未起飞，或不在约 250 公里实时覆盖内'}
               </small>
             </div>
           )}
