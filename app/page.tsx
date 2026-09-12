@@ -44,6 +44,7 @@ type ScanResult = {
   matchedCallsign: string | null;
   timestamp: number;
   remaining: string | null;
+  source: string;
 };
 
 type Prediction = {
@@ -611,7 +612,8 @@ export default function Home() {
             <div>
               <strong>{message}</strong>
               <span>
-                OpenSky · {formatClock(result?.timestamp ?? null)} 更新
+                {result?.source || '实时 ADS-B'} ·{' '}
+                {formatClock(result?.timestamp ?? null)} 更新
               </span>
             </div>
           </div>
