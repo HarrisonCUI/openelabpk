@@ -284,6 +284,7 @@ export async function GET(request: Request) {
           accept: 'application/json',
           'user-agent': 'Overhead-Aircraft-Radar/1.0',
         },
+        signal: AbortSignal.timeout(3500),
       },
     );
     if (!upstream.ok) throw new Error(`OpenSky ${upstream.status}`);
@@ -318,7 +319,10 @@ export async function GET(request: Request) {
     try {
       const fallback = await fetch(
         `https://api.adsb.lol/v2/point/${lat}/${lon}/${nauticalMiles}`,
-        { headers: { accept: 'application/json' } },
+        {
+          headers: { accept: 'application/json' },
+          signal: AbortSignal.timeout(8000),
+        },
       );
       if (!fallback.ok) throw new Error(`ADSB.lol ${fallback.status}`);
       const data = (await fallback.json()) as AdsbLolResponse;
