@@ -323,6 +323,12 @@ export async function GET(request: Request) {
       {
         name: 'ADSB.fi',
         url: `https://opendata.adsb.fi/api/v3/lat/${lat}/lon/${lon}/dist/${nauticalMiles}`,
+        wrapped: false,
+      },
+      {
+        name: 'ADSB.fi · Jina',
+        url: `https://r.jina.ai/http://opendata.adsb.fi/api/v3/lat/${lat}/lon/${lon}/dist/${nauticalMiles}?minute=${Math.floor(Date.now() / 60_000)}`,
+        wrapped: true,
       },
     ];
     let data: AdsbLolResponse | null = null;
@@ -334,7 +340,15 @@ export async function GET(request: Request) {
           signal: AbortSignal.timeout(4500),
         });
         if (!fallback.ok) continue;
-        data = (await fallback.json()) as AdsbLolResponse;
+        if (provider.wrapped) {
+          const content = await fallback.text();
+          const start = content.indexOf('{"ac"');
+          const end = content.lastIndexOf('}');
+          if (start < 0 || end <= start) continue;
+          data = JSON.parse(content.slice(start, end + 1)) as AdsbLolResponse;
+        } else {
+          data = (await fallback.json()) as AdsbLolResponse;
+        }
         source = provider.name;
         break;
       } catch {
