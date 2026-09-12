@@ -3,7 +3,6 @@
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Clock3,
   LocateFixed,
   Navigation,
   Plane,
@@ -78,6 +77,8 @@ type WebMcpContext = {
 
 const STORAGE_KEY = 'overhead-display-location';
 const DEFAULT_RADIUS = 35;
+const DEFAULT_POSITION: Coordinates = { lat: 22.5431, lon: 114.0579 };
+const DEFAULT_LOCATION_LABEL = '默认位置 · 深圳';
 const GITHUB_PAGES_API =
   'https://overhead-aircraft-radar.wizardofozai.chatgpt.site/api/aircraft';
 
@@ -161,6 +162,7 @@ export default function Home() {
   const [now, setNow] = useState<Date | null>(null);
   const [trackedFlight, setTrackedFlight] = useState('');
   const [flightInput, setFlightInput] = useState('');
+  const [locationLabel, setLocationLabel] = useState(DEFAULT_LOCATION_LABEL);
 
   const scan = useCallback(
     async (
@@ -220,8 +222,8 @@ export default function Home() {
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) {
-      setStatus('error');
-      setMessage('当前浏览器不支持定位。');
+      setLocationLabel(DEFAULT_LOCATION_LABEL);
+      void scan(DEFAULT_POSITION).catch(() => undefined);
       return;
     }
 
@@ -234,6 +236,7 @@ export default function Home() {
           lon: Math.round(coords.longitude * 1000) / 1000,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        setLocationLabel('当前位置');
         const url = new URL(window.location.href);
         url.searchParams.set('lat', next.lat.toString());
         url.searchParams.set('lon', next.lon.toString());
@@ -242,12 +245,13 @@ export default function Home() {
         void scan(next).catch(() => undefined);
       },
       (error) => {
-        setStatus('error');
+        setLocationLabel(DEFAULT_LOCATION_LABEL);
         setMessage(
           error.code === error.PERMISSION_DENIED
-            ? '定位权限被拒绝，请开启位置权限后重试。'
-            : '无法确定位置，请检查系统定位服务。',
+            ? '无法使用设备定位，已切换到深圳默认位置。'
+            : '定位暂不可用，已切换到深圳默认位置。',
         );
+        void scan(DEFAULT_POSITION).catch(() => undefined);
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 300000 },
     );
@@ -266,7 +270,8 @@ export default function Home() {
     const queryLat = latParam === null ? Number.NaN : Number(latParam);
     const queryLon = lonParam === null ? Number.NaN : Number(lonParam);
     const queryRadius = radiusParam === null ? Number.NaN : Number(radiusParam);
-    let initial: Coordinates | null = null;
+    let initial = DEFAULT_POSITION;
+    let initialLocationLabel = DEFAULT_LOCATION_LABEL;
 
     if (
       Number.isFinite(queryLat) &&
@@ -277,6 +282,7 @@ export default function Home() {
       queryLon <= 180
     ) {
       initial = { lat: queryLat, lon: queryLon };
+      initialLocationLabel = '网址指定位置';
     } else {
       try {
         const stored = JSON.parse(
@@ -286,8 +292,10 @@ export default function Home() {
           stored &&
           Number.isFinite(stored.lat) &&
           Number.isFinite(stored.lon)
-        )
+        ) {
           initial = stored;
+          initialLocationLabel = '已保存位置';
+        }
       } catch {
         // Ignore malformed local preferences.
       }
@@ -300,8 +308,8 @@ export default function Home() {
     setRadius(initialRadius);
     setTrackedFlight(queryFlight);
     setFlightInput(queryFlight);
-    if (initial)
-      void scan(initial, initialRadius, queryFlight).catch(() => undefined);
+    setLocationLabel(initialLocationLabel);
+    void scan(initial, initialRadius, queryFlight).catch(() => undefined);
     return () => window.clearInterval(timer);
     // The initial URL and saved location are intentionally read once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -379,6 +387,7 @@ export default function Home() {
                 : '';
             setTrackedFlight(flightNumber);
             setFlightInput(flightNumber);
+            setLocationLabel('指定位置');
             const next = await scan(
               { lat: latitude, lon: longitude },
               radiusKm,
@@ -533,7 +542,13 @@ export default function Home() {
             </>
           ) : (
             <div className="quiet-state">
-              <h1>{position && result ? '天空很安静' : '等待定位'}</h1>
+              <h1>
+                {status === 'error'
+                  ? '数据暂不可用'
+                  : position && result
+                    ? '天空很安静'
+                    : '正在准备'}
+              </h1>
               <p>{message}</p>
               {!position && (
                 <Button
@@ -596,13 +611,19 @@ export default function Home() {
           <p>按当前速度和航向直线估算，不是航司计划时间</p>
         </form>
 
-        <aside className="airspace-note">
+        <button
+          className="airspace-note"
+          type="button"
+          onClick={locate}
+          disabled={isBusy}
+          aria-label={`${locationLabel}，点击重新定位`}
+        >
           <Navigation aria-hidden="true" />
           <div>
-            <span>扫描范围</span>
-            <strong>{radius} 公里</strong>
+            <span>{locationLabel}</span>
+            <strong>{radius} 公里 · 重新定位</strong>
           </div>
-        </aside>
+        </button>
 
         <section className="flight-strip" aria-label="附近航班列表">
           <div className="strip-intro">
@@ -612,7 +633,7 @@ export default function Home() {
             <div>
               <strong>{message}</strong>
               <span>
-                {result?.source || '实时 ADS-B'} ·{' '}
+                {result?.source || 'OpenSky'} ·{' '}
                 {formatClock(result?.timestamp ?? null)} 更新
               </span>
             </div>

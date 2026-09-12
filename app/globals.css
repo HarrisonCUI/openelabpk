@@ -297,6 +297,13 @@ button {
   color: #15345d;
   background: rgb(255 253 247 / 97%);
   box-shadow: 5px 6px 0 rgb(8 36 78 / 24%);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.airspace-note:disabled {
+  cursor: wait;
+  opacity: 0.78;
 }
 
 .flight-search-card {

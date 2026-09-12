@@ -21,6 +21,23 @@ type OpenSkyState = [
 
 type OpenSkyResponse = { time: number; states: OpenSkyState[] | null };
 
+type AdsbLolAircraft = {
+  hex?: string;
+  flight?: string;
+  lat?: number;
+  lon?: number;
+  alt_baro?: number | 'ground';
+  alt_geom?: number;
+  gs?: number;
+  track?: number;
+  baro_rate?: number;
+};
+
+type AdsbLolResponse = {
+  ac?: AdsbLolAircraft[];
+  now?: number;
+};
+
 type NormalizedAircraft = {
   icao24: string;
   callsign: string | null;
@@ -37,6 +54,7 @@ type NormalizedAircraft = {
 };
 
 const responseCache = new Map<string, { expires: number; body: string }>();
+const SHENZHEN_FALLBACK = { lat: 22.5431, lon: 114.0579 };
 const corsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, OPTIONS',
@@ -267,7 +285,7 @@ export async function GET(request: Request) {
           accept: 'application/json',
           'user-agent': 'Overhead-Aircraft-Radar/1.0',
         },
-        signal: AbortSignal.timeout(2000),
+        signal: AbortSignal.timeout(10_000),
       },
     );
     if (!upstream.ok) throw new Error(`OpenSky ${upstream.status}`);
@@ -297,7 +315,65 @@ export async function GET(request: Request) {
         };
       });
   } catch {
-    return json({ error: '暂时连接不上 OpenSky，请稍后再试。' }, 502);
+    const isShenzhenFallback =
+      Math.abs(lat - SHENZHEN_FALLBACK.lat) < 0.000_001 &&
+      Math.abs(lon - SHENZHEN_FALLBACK.lon) < 0.000_001;
+    if (!isShenzhenFallback) {
+      return json({ error: '暂时连接不上 OpenSky，请稍后再试。' }, 502);
+    }
+
+    try {
+      const nauticalMiles = Math.min(250, Math.ceil(searchRadius / 1.852));
+      const fallback = await fetch(
+        `https://api.adsb.lol/v2/point/${SHENZHEN_FALLBACK.lat}/${SHENZHEN_FALLBACK.lon}/${nauticalMiles}`,
+        {
+          headers: { accept: 'application/json' },
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      if (!fallback.ok) throw new Error(`ADSB.lol ${fallback.status}`);
+
+      const data = (await fallback.json()) as AdsbLolResponse;
+      dataTime = data.now ? Math.floor(data.now / 1000) : dataTime;
+      source = 'ADSB.lol · 深圳兜底';
+      allAircraft = (data.ac ?? [])
+        .filter(
+          (item) =>
+            typeof item.lat === 'number' &&
+            typeof item.lon === 'number' &&
+            item.alt_baro !== 'ground',
+        )
+        .map((item) => {
+          const latitude = item.lat as number;
+          const longitude = item.lon as number;
+          const position = distanceAndBearing(lat, lon, latitude, longitude);
+          const altitudeFeet =
+            typeof item.alt_geom === 'number'
+              ? item.alt_geom
+              : typeof item.alt_baro === 'number'
+                ? item.alt_baro
+                : null;
+          return {
+            icao24: item.hex ?? 'unknown',
+            callsign: item.flight?.trim() || null,
+            country: '实时 ADS-B',
+            longitude,
+            latitude,
+            altitude: altitudeFeet === null ? null : altitudeFeet * 0.3048,
+            velocity: typeof item.gs === 'number' ? item.gs * 0.514_444 : null,
+            track: typeof item.track === 'number' ? item.track : null,
+            verticalRate:
+              typeof item.baro_rate === 'number'
+                ? item.baro_rate * 0.005_08
+                : null,
+            category: null,
+            distance: position.distance,
+            bearing: position.bearing,
+          };
+        });
+    } catch {
+      return json({ error: '深圳实时航班数据暂时不可用，请稍后重试。' }, 502);
+    }
   }
   const aircraft = allAircraft
     .filter((item) => item.distance <= radius)
