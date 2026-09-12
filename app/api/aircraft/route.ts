@@ -314,57 +314,74 @@ export async function GET(request: Request) {
         };
       });
   } catch {
-    source = 'ADSB.lol';
     const nauticalMiles = Math.min(250, Math.ceil(searchRadius / 1.852));
-    try {
-      const fallback = await fetch(
-        `https://api.adsb.lol/v2/point/${lat}/${lon}/${nauticalMiles}`,
-        {
+    const providers = [
+      {
+        name: 'ADSB.lol',
+        url: `https://api.adsb.lol/v2/point/${lat}/${lon}/${nauticalMiles}`,
+      },
+      {
+        name: 'ADSB.fi',
+        url: `https://opendata.adsb.fi/api/v3/lat/${lat}/lon/${lon}/dist/${nauticalMiles}`,
+      },
+    ];
+    let data: AdsbLolResponse | null = null;
+
+    for (const provider of providers) {
+      try {
+        const fallback = await fetch(provider.url, {
           headers: { accept: 'application/json' },
-          signal: AbortSignal.timeout(8000),
-        },
-      );
-      if (!fallback.ok) throw new Error(`ADSB.lol ${fallback.status}`);
-      const data = (await fallback.json()) as AdsbLolResponse;
-      dataTime = data.now ? Math.floor(data.now / 1000) : dataTime;
-      allAircraft = (data.ac ?? [])
-        .filter(
-          (item) =>
-            typeof item.lat === 'number' &&
-            typeof item.lon === 'number' &&
-            item.alt_baro !== 'ground',
-        )
-        .map((item) => {
-          const latitude = item.lat as number;
-          const longitude = item.lon as number;
-          const position = distanceAndBearing(lat, lon, latitude, longitude);
-          const altitudeFeet =
-            typeof item.alt_geom === 'number'
-              ? item.alt_geom
-              : typeof item.alt_baro === 'number'
-                ? item.alt_baro
-                : null;
-          return {
-            icao24: item.hex || 'unknown',
-            callsign: item.flight?.trim() || null,
-            country: '实时 ADS-B',
-            longitude,
-            latitude,
-            altitude: altitudeFeet === null ? null : altitudeFeet * 0.3048,
-            velocity: typeof item.gs === 'number' ? item.gs * 0.514444 : null,
-            track: typeof item.track === 'number' ? item.track : null,
-            verticalRate:
-              typeof item.baro_rate === 'number'
-                ? item.baro_rate * 0.00508
-                : null,
-            category: null,
-            distance: position.distance,
-            bearing: position.bearing,
-          };
+          signal: AbortSignal.timeout(4500),
         });
-    } catch {
+        if (!fallback.ok) continue;
+        data = (await fallback.json()) as AdsbLolResponse;
+        source = provider.name;
+        break;
+      } catch {
+        // Try the next public ADS-B provider.
+      }
+    }
+
+    if (!data) {
       return json({ error: '实时航班数据源暂时不可用，请稍后重试。' }, 502);
     }
+
+    dataTime = data.now ? Math.floor(data.now / 1000) : dataTime;
+    allAircraft = (data.ac ?? [])
+      .filter(
+        (item) =>
+          typeof item.lat === 'number' &&
+          typeof item.lon === 'number' &&
+          item.alt_baro !== 'ground',
+      )
+      .map((item) => {
+        const latitude = item.lat as number;
+        const longitude = item.lon as number;
+        const position = distanceAndBearing(lat, lon, latitude, longitude);
+        const altitudeFeet =
+          typeof item.alt_geom === 'number'
+            ? item.alt_geom
+            : typeof item.alt_baro === 'number'
+              ? item.alt_baro
+              : null;
+        return {
+          icao24: item.hex || 'unknown',
+          callsign: item.flight?.trim() || null,
+          country: '实时 ADS-B',
+          longitude,
+          latitude,
+          altitude: altitudeFeet === null ? null : altitudeFeet * 0.3048,
+          velocity: typeof item.gs === 'number' ? item.gs * 0.514444 : null,
+          track: typeof item.track === 'number' ? item.track : null,
+          verticalRate:
+            typeof item.baro_rate === 'number'
+              ? item.baro_rate * 0.00508
+              : null,
+          category: null,
+          distance: position.distance,
+          bearing: position.bearing,
+        };
+      });
   }
   const aircraft = allAircraft
     .filter((item) => item.distance <= radius)
