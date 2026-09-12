@@ -287,7 +287,7 @@ button {
 .airspace-note {
   position: absolute;
   right: 4.3%;
-  top: 24%;
+  top: 53%;
   display: flex;
   align-items: center;
   gap: 13px;
@@ -295,6 +295,87 @@ button {
   border: 2px solid rgb(255 255 255 / 72%);
   color: #15345d;
   background: rgb(255 253 247 / 90%);
+}
+
+.flight-search-card {
+  position: absolute;
+  top: 23%;
+  right: 4.3%;
+  width: 27%;
+  padding: clamp(16px, 1.8vw, 28px);
+  border: 2px solid rgb(255 255 255 / 88%);
+  color: #142b4d;
+  background: rgb(255 253 247 / 94%);
+  box-shadow: 0 12px 36px rgb(6 30 67 / 22%);
+}
+.flight-search-card > label {
+  display: block;
+  margin-bottom: 11px;
+  color: #e34f3e;
+  font:
+    750 clamp(0.78rem, 0.9vw, 1rem)/1 var(--font-geist-mono),
+    monospace;
+  letter-spacing: 0.12em;
+}
+.flight-search-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.flight-search-row input {
+  height: clamp(43px, 3.6vw, 57px);
+  border: 2px solid #99aec2;
+  border-radius: 2px;
+  color: #142b4d;
+  background: #fff;
+  font:
+    750 clamp(1rem, 1.25vw, 1.45rem)/1 var(--font-geist-mono),
+    monospace;
+  text-transform: uppercase;
+}
+.flight-search-row button {
+  width: clamp(43px, 3.6vw, 57px);
+  height: clamp(43px, 3.6vw, 57px);
+  border-radius: 2px;
+  color: #fff;
+  background: #e95745;
+}
+.flight-search-row button:hover {
+  background: #cb4032;
+}
+.flight-search-row button svg {
+  width: 21px;
+  height: 21px;
+}
+.flight-search-card > p {
+  margin: 11px 0 0;
+  color: #687e94;
+  font-size: clamp(0.66rem, 0.72vw, 0.78rem);
+  line-height: 1.4;
+}
+.flight-prediction {
+  display: flex;
+  flex-direction: column;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 2px solid #d8e1e9;
+}
+.flight-prediction span {
+  color: #637993;
+  font:
+    700 0.74rem/1.2 var(--font-geist-mono),
+    monospace;
+}
+.flight-prediction strong {
+  margin-top: 5px;
+  font-size: clamp(0.9rem, 1.1vw, 1.25rem);
+  line-height: 1.25;
+}
+.flight-prediction small {
+  margin-top: 5px;
+  color: #5e748b;
+  font-size: clamp(0.68rem, 0.76vw, 0.86rem);
+  line-height: 1.4;
 }
 .airspace-note > svg {
   width: 22px;
@@ -337,6 +418,12 @@ button {
     700 0.75rem/1 var(--font-geist-mono),
     monospace;
   letter-spacing: 0.03em;
+}
+.sky-plane.is-target {
+  z-index: 1;
+  border-color: #f2b33d;
+  background: #fff3ca;
+  box-shadow: 0 0 0 4px rgb(242 179 61 / 35%);
 }
 .sky-plane-2,
 .sky-plane-3 {
@@ -485,7 +572,11 @@ button {
     width: 56%;
   }
   .airspace-note {
-    top: 14%;
+    top: 57%;
+  }
+  .flight-search-card {
+    top: 23%;
+    width: 39%;
   }
   .flight-strip {
     grid-template-columns: 1fr;

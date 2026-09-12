@@ -8,10 +8,18 @@ import {
   Navigation,
   Plane,
   RefreshCw,
+  Search,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type Aircraft = {
   icao24: string;
@@ -30,8 +38,25 @@ type Aircraft = {
 
 type ScanResult = {
   aircraft: Aircraft[];
+  target: Aircraft | null;
+  prediction: Prediction | null;
+  trackedFlight: string | null;
+  matchedCallsign: string | null;
   timestamp: number;
   remaining: string | null;
+};
+
+type Prediction = {
+  status:
+    | 'insufficient_data'
+    | 'moving_away'
+    | 'beyond_horizon'
+    | 'overhead'
+    | 'nearby'
+    | 'off_course';
+  etaMinutes: number | null;
+  closestDistance: number | null;
+  passTimestamp: number | null;
 };
 
 type Coordinates = { lat: number; lon: number };
@@ -52,6 +77,15 @@ type WebMcpContext = {
 
 const STORAGE_KEY = 'overhead-display-location';
 const DEFAULT_RADIUS = 35;
+const GITHUB_PAGES_API =
+  'https://overhead-aircraft-radar.wizardofozai.chatgpt.site/api/aircraft';
+
+function aircraftApiUrl(params: URLSearchParams) {
+  const endpoint = window.location.hostname.endsWith('github.io')
+    ? GITHUB_PAGES_API
+    : '/api/aircraft';
+  return `${endpoint}?${params}`;
+}
 
 function formatAltitude(meters: number | null) {
   return meters === null
@@ -95,6 +129,24 @@ function verticalLabel(rate: number | null) {
   return rate > 0 ? '爬升中' : '下降中';
 }
 
+function predictionTitle(prediction: Prediction | null) {
+  if (!prediction) return '等待实时信号';
+  if (prediction.status === 'moving_away') return '这架飞机正在远离';
+  if (prediction.status === 'insufficient_data') return '航向数据暂不完整';
+  if (prediction.status === 'beyond_horizon') return '预计经过时间较远';
+  if (prediction.status === 'off_course') return '当前航迹不会飞近';
+  return `${formatClock(prediction.passTimestamp)} 最接近你`;
+}
+
+function predictionDetail(prediction: Prediction | null) {
+  if (!prediction) return '航班进入约 500 公里实时空域后显示';
+  if (prediction.status === 'moving_away') return '可继续观察下一次实时更新';
+  if (prediction.status === 'insufficient_data')
+    return 'OpenSky 暂未提供足够的速度或航向';
+  if (prediction.closestDistance === null) return '暂时无法估算最近距离';
+  return `按当前航向估算，最近约 ${prediction.closestDistance.toFixed(1)} 公里`;
+}
+
 export default function Home() {
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
   const [position, setPosition] = useState<Coordinates | null>(null);
@@ -106,12 +158,21 @@ export default function Home() {
     '设置一次位置，这块电子纸就能持续显示头顶航班。',
   );
   const [now, setNow] = useState<Date | null>(null);
+  const [trackedFlight, setTrackedFlight] = useState('');
+  const [flightInput, setFlightInput] = useState('');
 
   const scan = useCallback(
-    async (coords?: Coordinates, radiusOverride?: number) => {
+    async (
+      coords?: Coordinates,
+      radiusOverride?: number,
+      flightOverride?: string,
+    ) => {
       const target = coords ?? position;
       if (!target) throw new Error('需要先设置显示位置。');
       const scanRadius = radiusOverride ?? radius;
+      const flightCode = (flightOverride ?? trackedFlight)
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
       setPosition(target);
       setStatus('scanning');
       setMessage('正在读取附近空域…');
@@ -122,7 +183,8 @@ export default function Home() {
           lon: target.lon.toString(),
           radius: scanRadius.toString(),
         });
-        const response = await fetch(`/api/aircraft?${params}`);
+        if (flightCode) params.set('flight', flightCode);
+        const response = await fetch(aircraftApiUrl(params));
         const payload: unknown = await response.json();
         if (!response.ok) {
           const errorPayload = payload as { error?: string };
@@ -132,11 +194,17 @@ export default function Home() {
         const nextResult = payload as ScanResult;
         setResult(nextResult);
         setStatus('ready');
-        setMessage(
-          nextResult.aircraft.length
-            ? `附近有 ${nextResult.aircraft.length} 架飞行中的飞机`
-            : `${scanRadius} 公里内暂时没有收到飞机信号`,
-        );
+        if (flightCode && nextResult.target) {
+          setMessage(`已找到 ${nextResult.target.callsign || flightCode}`);
+        } else if (flightCode) {
+          setMessage(`暂未在实时空域找到 ${flightCode}`);
+        } else {
+          setMessage(
+            nextResult.aircraft.length
+              ? `附近有 ${nextResult.aircraft.length} 架飞行中的飞机`
+              : `${scanRadius} 公里内暂时没有收到飞机信号`,
+          );
+        }
         return nextResult;
       } catch (error) {
         setStatus('error');
@@ -146,7 +214,7 @@ export default function Home() {
         throw error;
       }
     },
-    [position, radius],
+    [position, radius, trackedFlight],
   );
 
   const locate = useCallback(() => {
@@ -191,6 +259,9 @@ export default function Home() {
     const latParam = params.get('lat');
     const lonParam = params.get('lon');
     const radiusParam = params.get('radius');
+    const queryFlight = (params.get('flight') ?? '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
     const queryLat = latParam === null ? Number.NaN : Number(latParam);
     const queryLon = lonParam === null ? Number.NaN : Number(lonParam);
     const queryRadius = radiusParam === null ? Number.NaN : Number(radiusParam);
@@ -226,7 +297,10 @@ export default function Home() {
         ? queryRadius
         : DEFAULT_RADIUS;
     setRadius(initialRadius);
-    if (initial) void scan(initial, initialRadius).catch(() => undefined);
+    setTrackedFlight(queryFlight);
+    setFlightInput(queryFlight);
+    if (initial)
+      void scan(initial, initialRadius, queryFlight).catch(() => undefined);
     return () => window.clearInterval(timer);
     // The initial URL and saved location are intentionally read once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -262,6 +336,10 @@ export default function Home() {
               latitude: { type: 'number', minimum: -90, maximum: 90 },
               longitude: { type: 'number', minimum: -180, maximum: 180 },
               radiusKm: { type: 'number', minimum: 10, maximum: 50 },
+              flightNumber: {
+                type: 'string',
+                description: '可选航班号，例如 MU5123',
+              },
             },
             required: ['latitude', 'longitude'],
             additionalProperties: false,
@@ -272,6 +350,7 @@ export default function Home() {
               latitude?: unknown;
               longitude?: unknown;
               radiusKm?: unknown;
+              flightNumber?: unknown;
             };
             const latitude = Number(value.latitude);
             const longitude = Number(value.longitude);
@@ -293,12 +372,21 @@ export default function Home() {
               throw new Error('经纬度或搜索半径无效。');
             }
             setRadius(radiusKm);
+            const flightNumber =
+              typeof value.flightNumber === 'string'
+                ? value.flightNumber.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                : '';
+            setTrackedFlight(flightNumber);
+            setFlightInput(flightNumber);
             const next = await scan(
               { lat: latitude, lon: longitude },
               radiusKm,
+              flightNumber,
             );
             return {
               count: next.aircraft.length,
+              trackedFlight: next.trackedFlight,
+              prediction: next.prediction,
               nearest: next.aircraft[0]
                 ? {
                     callsign: next.aircraft[0].callsign,
@@ -316,9 +404,36 @@ export default function Home() {
     return () => lifecycle.abort();
   }, [scan]);
 
-  const nearest = result?.aircraft[0] ?? null;
+  const featured = result?.target ?? result?.aircraft[0] ?? null;
   const flights = useMemo(() => result?.aircraft.slice(0, 5) ?? [], [result]);
+  const plottedFlights = useMemo(() => {
+    const candidates = result?.target
+      ? [result.target, ...(result.aircraft ?? [])]
+      : (result?.aircraft ?? []);
+    return candidates
+      .filter(
+        (flight, index, list) =>
+          list.findIndex((item) => item.icao24 === flight.icao24) === index,
+      )
+      .slice(0, 5);
+  }, [result]);
   const isBusy = status === 'locating' || status === 'scanning';
+
+  const trackFlight = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const code = flightInput.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    setFlightInput(code);
+    setTrackedFlight(code);
+    const url = new URL(window.location.href);
+    if (code) url.searchParams.set('flight', code);
+    else url.searchParams.delete('flight');
+    window.history.replaceState({}, '', url);
+    if (!position) {
+      setMessage('请先设置显示位置，再追踪这趟航班。');
+      return;
+    }
+    void scan(position, radius, code).catch(() => undefined);
+  };
 
   return (
     <main className="epaper-page">
@@ -328,7 +443,7 @@ export default function Home() {
       >
         <img
           className="art-background"
-          src="/epaper-background.png"
+          src="epaper-background.png"
           alt="仰望天空的奇幻角色插画"
         />
         <div className="sky-wash" aria-hidden="true" />
@@ -347,14 +462,18 @@ export default function Home() {
           </div>
         </header>
 
-        {flights.map((flight, index) => {
-          const spread = Math.min(flight.distance / radius, 1);
+        {plottedFlights.map((flight, index) => {
+          const isTarget = result?.target?.icao24 === flight.icao24;
+          const spread = Math.min(
+            flight.distance / (isTarget ? Math.max(radius, 120) : radius),
+            1,
+          );
           const angle = (flight.bearing * Math.PI) / 180;
           const left = 50 + Math.sin(angle) * spread * 39;
           const top = 27 - Math.cos(angle) * spread * 17;
           return (
             <div
-              className={`sky-plane sky-plane-${Math.min(index, 3)}`}
+              className={`sky-plane sky-plane-${Math.min(index, 3)} ${isTarget ? 'is-target' : ''}`}
               key={flight.icao24}
               style={{
                 left: `${left}%`,
@@ -371,39 +490,43 @@ export default function Home() {
         })}
 
         <section className="hero-card" aria-live="polite">
-          <p className="kicker">NEAREST AIRCRAFT · 最近</p>
-          {nearest ? (
+          <p className="kicker">
+            {result?.target
+              ? 'TRACKED FLIGHT · 追踪航班'
+              : 'NEAREST AIRCRAFT · 最近'}
+          </p>
+          {featured ? (
             <>
               <div className="flight-name-row">
-                <h1>{nearest.callsign || nearest.icao24.toUpperCase()}</h1>
-                <span>{nearest.distance.toFixed(1)} km</span>
+                <h1>{featured.callsign || featured.icao24.toUpperCase()}</h1>
+                <span>{featured.distance.toFixed(1)} km</span>
               </div>
               <p className="flight-origin">
-                {nearest.country} · ICAO {nearest.icao24.toUpperCase()}
+                {featured.country} · ICAO {featured.icao24.toUpperCase()}
               </p>
               <dl className="primary-stats">
                 <div>
                   <dt>飞行高度</dt>
-                  <dd>{formatAltitude(nearest.altitude)}</dd>
+                  <dd>{formatAltitude(featured.altitude)}</dd>
                 </div>
                 <div>
                   <dt>地面速度</dt>
-                  <dd>{formatSpeed(nearest.velocity)}</dd>
+                  <dd>{formatSpeed(featured.velocity)}</dd>
                 </div>
                 <div>
                   <dt>当前航向</dt>
-                  <dd>{formatHeading(nearest.track)}</dd>
+                  <dd>{formatHeading(featured.track)}</dd>
                 </div>
                 <div>
                   <dt>
-                    {(nearest.verticalRate ?? 0) < 0 ? (
+                    {(featured.verticalRate ?? 0) < 0 ? (
                       <ArrowDownRight aria-hidden="true" />
                     ) : (
                       <ArrowUpRight aria-hidden="true" />
                     )}{' '}
                     飞行状态
                   </dt>
-                  <dd>{verticalLabel(nearest.verticalRate)}</dd>
+                  <dd>{verticalLabel(featured.verticalRate)}</dd>
                 </div>
               </dl>
             </>
@@ -428,6 +551,49 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        <form className="flight-search-card" onSubmit={trackFlight}>
+          <label htmlFor="flight-number">追踪航班</label>
+          <div className="flight-search-row">
+            <Input
+              id="flight-number"
+              value={flightInput}
+              onChange={(event) => setFlightInput(event.target.value)}
+              placeholder="例如 MU5123"
+              autoComplete="off"
+              maxLength={10}
+              aria-label="输入航班号"
+            />
+            <Button type="submit" disabled={isBusy} aria-label="查询航班">
+              {isBusy ? (
+                <RefreshCw className="spin" aria-hidden="true" />
+              ) : (
+                <Search aria-hidden="true" />
+              )}
+            </Button>
+          </div>
+          {trackedFlight && (
+            <div className="flight-prediction" aria-live="polite">
+              <span>
+                {result?.target?.callsign || trackedFlight}
+                {result?.target && result.target.callsign !== trackedFlight
+                  ? ` · ${trackedFlight}`
+                  : ''}
+              </span>
+              <strong>
+                {result?.target
+                  ? predictionTitle(result.prediction)
+                  : '暂未收到该航班'}
+              </strong>
+              <small>
+                {result?.target
+                  ? predictionDetail(result.prediction)
+                  : '可能尚未起飞，或不在约 500 公里实时覆盖内'}
+              </small>
+            </div>
+          )}
+          <p>按当前速度和航向直线估算，不是航司计划时间</p>
+        </form>
 
         <aside className="airspace-note">
           <Navigation aria-hidden="true" />
