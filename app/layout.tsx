@@ -18,9 +18,9 @@ const notoSansSC = Noto_Sans_SC({
 });
 
 export const metadata: Metadata = {
-  title: '头顶航班雷达',
+  title: 'reTerminal E1004 头顶航班画面',
   description:
-    '定位当前位置，查看此刻附近正在飞行的飞机。实时数据来自 OpenSky Network。',
+    '为 13.3 英寸全彩电子纸设计的头顶航班常显画面，实时数据来自 OpenSky Network。',
 };
 
 export default function RootLayout({
