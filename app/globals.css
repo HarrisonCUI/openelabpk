@@ -45,6 +45,11 @@
   --border: rgb(25 56 93 / 22%);
   --input: rgb(25 56 93 / 24%);
   --ring: #e95745;
+  --font-noto-sans-sc:
+    'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-geist-sans: Inter, system-ui, sans-serif;
+  --font-geist-mono:
+    'SFMono-Regular', 'Roboto Mono', 'Liberation Mono', monospace;
 }
 
 * {
@@ -97,15 +102,7 @@ button {
   position: absolute;
   inset: 0;
   z-index: -3;
-  background:
-    linear-gradient(
-      90deg,
-      rgb(8 35 78 / 78%) 0%,
-      rgb(12 46 91 / 42%) 34%,
-      transparent 61%
-    ),
-    linear-gradient(0deg, rgb(8 28 61 / 90%) 0%, transparent 35%),
-    linear-gradient(180deg, rgb(7 35 78 / 35%) 0%, transparent 30%);
+  background: rgb(8 35 78 / 12%);
 }
 
 .display-header {
@@ -170,14 +167,16 @@ button {
 .hero-card {
   position: absolute;
   left: 4.3%;
-  top: 23%;
-  width: 39%;
-  min-height: 39%;
+  top: 24%;
+  width: 36%;
+  min-height: 37%;
   padding: clamp(22px, 2.8vw, 46px);
-  border: 2px solid rgb(255 255 255 / 88%);
+  border: 3px solid #15355f;
+  border-left: clamp(7px, 0.65vw, 11px) solid #f0ae33;
+  border-radius: 6px;
   color: #142b4d;
-  background: rgb(255 253 247 / 94%);
-  box-shadow: 0 12px 36px rgb(6 30 67 / 22%);
+  background: rgb(255 253 247 / 97%);
+  box-shadow: 9px 10px 0 rgb(8 36 78 / 28%);
 }
 
 .kicker {
@@ -207,7 +206,8 @@ button {
   flex: 0 0 auto;
   padding: 8px 11px;
   color: #fff;
-  background: #e95745;
+  border-radius: 3px;
+  background: #d94739;
   font:
     700 clamp(0.8rem, 1vw, 1.1rem)/1 var(--font-geist-mono),
     monospace;
@@ -226,14 +226,14 @@ button {
   grid-template-columns: 1fr 1fr;
   gap: 0;
   margin: 0;
-  border-top: 2px solid #c7d5e2;
-  border-left: 2px solid #c7d5e2;
+  border-top: 2px solid #9cb1c5;
+  border-left: 2px solid #9cb1c5;
 }
 .primary-stats > div {
   min-width: 0;
   padding: clamp(12px, 1.25vw, 20px);
-  border-right: 2px solid #c7d5e2;
-  border-bottom: 2px solid #c7d5e2;
+  border-right: 2px solid #9cb1c5;
+  border-bottom: 2px solid #9cb1c5;
 }
 .primary-stats dt {
   display: flex;
@@ -287,26 +287,30 @@ button {
 .airspace-note {
   position: absolute;
   right: 4.3%;
-  top: 53%;
+  top: 54%;
   display: flex;
   align-items: center;
   gap: 13px;
   padding: 13px 17px;
-  border: 2px solid rgb(255 255 255 / 72%);
+  border: 2px solid #15355f;
+  border-radius: 4px;
   color: #15345d;
-  background: rgb(255 253 247 / 90%);
+  background: rgb(255 253 247 / 97%);
+  box-shadow: 5px 6px 0 rgb(8 36 78 / 24%);
 }
 
 .flight-search-card {
   position: absolute;
   top: 23%;
   right: 4.3%;
-  width: 27%;
+  width: 26%;
   padding: clamp(16px, 1.8vw, 28px);
-  border: 2px solid rgb(255 255 255 / 88%);
+  border: 3px solid #15355f;
+  border-top: clamp(7px, 0.65vw, 11px) solid #f0ae33;
+  border-radius: 6px;
   color: #142b4d;
-  background: rgb(255 253 247 / 94%);
-  box-shadow: 0 12px 36px rgb(6 30 67 / 22%);
+  background: rgb(255 253 247 / 97%);
+  box-shadow: 8px 9px 0 rgb(8 36 78 / 28%);
 }
 .flight-search-card > label {
   display: block;
@@ -325,7 +329,7 @@ button {
 .flight-search-row input {
   height: clamp(43px, 3.6vw, 57px);
   border: 2px solid #99aec2;
-  border-radius: 2px;
+  border-radius: 3px;
   color: #142b4d;
   background: #fff;
   font:
@@ -336,7 +340,8 @@ button {
 .flight-search-row button {
   width: clamp(43px, 3.6vw, 57px);
   height: clamp(43px, 3.6vw, 57px);
-  border-radius: 2px;
+  border: 2px solid #b9342b;
+  border-radius: 3px;
   color: #fff;
   background: #e95745;
 }
@@ -402,10 +407,11 @@ button {
   align-items: center;
   gap: 7px;
   padding: 7px 10px;
-  border: 2px solid rgb(255 255 255 / 80%);
+  border: 2px solid #15355f;
+  border-radius: 3px;
   color: #14365f;
   background: rgb(255 253 247 / 91%);
-  box-shadow: 0 5px 14px rgb(8 34 74 / 20%);
+  box-shadow: 4px 5px 0 rgb(8 34 74 / 20%);
   transform: translate(-50%, -50%);
 }
 .sky-plane svg {
@@ -434,17 +440,19 @@ button {
   position: absolute;
   left: 4.3%;
   right: 4.3%;
-  bottom: 8.5%;
+  bottom: 8%;
   min-height: 14%;
   display: grid;
   grid-template-columns: 1.1fr 2.4fr auto;
   align-items: center;
   gap: clamp(16px, 2vw, 34px);
   padding: clamp(18px, 2vw, 30px);
-  border-top: 3px solid #f0b445;
+  border: 3px solid #15355f;
+  border-top: clamp(7px, 0.65vw, 11px) solid #f0b445;
+  border-radius: 6px;
   color: #142b4d;
-  background: rgb(255 253 247 / 95%);
-  box-shadow: 0 12px 36px rgb(6 30 67 / 22%);
+  background: rgb(255 253 247 / 97%);
+  box-shadow: 8px 9px 0 rgb(6 30 67 / 25%);
 }
 
 .strip-intro {
@@ -569,14 +577,14 @@ button {
   }
   .hero-card {
     top: 22%;
-    width: 56%;
+    width: 52%;
   }
   .airspace-note {
     top: 57%;
   }
   .flight-search-card {
     top: 23%;
-    width: 39%;
+    width: 38%;
   }
   .flight-strip {
     grid-template-columns: 1fr;

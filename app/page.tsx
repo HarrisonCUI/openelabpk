@@ -462,22 +462,22 @@ export default function Home() {
           </div>
         </header>
 
-        {plottedFlights.map((flight, index) => {
+        {plottedFlights.slice(0, 1).map((flight, index) => {
           const isTarget = result?.target?.icao24 === flight.icao24;
           const spread = Math.min(
             flight.distance / (isTarget ? Math.max(radius, 120) : radius),
             1,
           );
           const angle = (flight.bearing * Math.PI) / 180;
-          const left = 50 + Math.sin(angle) * spread * 39;
-          const top = 27 - Math.cos(angle) * spread * 17;
+          const left = 56 + Math.sin(angle) * spread * 10;
+          const top = 28 - Math.cos(angle) * spread * 10;
           return (
             <div
               className={`sky-plane sky-plane-${Math.min(index, 3)} ${isTarget ? 'is-target' : ''}`}
               key={flight.icao24}
               style={{
-                left: `${left}%`,
-                top: `${Math.max(10, Math.min(46, top))}%`,
+                left: `${Math.max(45, Math.min(67, left))}%`,
+                top: `${Math.max(17, Math.min(43, top))}%`,
               }}
             >
               <Plane
