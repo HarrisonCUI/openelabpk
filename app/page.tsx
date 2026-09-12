@@ -189,6 +189,31 @@ export default function Home() {
       setStatus('scanning');
       setMessage('正在读取附近空域…');
 
+      const readShenzhenSnapshot = async () => {
+        const snapshotResponse = await fetch(
+          `${SHENZHEN_SNAPSHOT}?v=${Math.floor(Date.now() / 300_000)}`,
+          { cache: 'no-store' },
+        );
+        if (!snapshotResponse.ok) throw new Error('深圳快照暂时不可用。');
+        const snapshot = (await snapshotResponse.json()) as ScanResult;
+        setResult(snapshot);
+        setStatus('ready');
+        setMessage(
+          snapshot.aircraft.length
+            ? `深圳附近有 ${snapshot.aircraft.length} 架飞机（定时快照）`
+            : '深圳 35 公里内暂时没有收到飞机信号',
+        );
+        return snapshot;
+      };
+
+      if (isShenzhenFallback(target) && !flightCode) {
+        try {
+          return await readShenzhenSnapshot();
+        } catch {
+          // Use the realtime proxy when the GitHub snapshot is unavailable.
+        }
+      }
+
       try {
         const params = new URLSearchParams({
           lat: target.lat.toString(),
@@ -221,20 +246,7 @@ export default function Home() {
       } catch (error) {
         if (isShenzhenFallback(target)) {
           try {
-            const snapshotResponse = await fetch(
-              `${SHENZHEN_SNAPSHOT}?v=${Math.floor(Date.now() / 300_000)}`,
-              { cache: 'no-store' },
-            );
-            if (!snapshotResponse.ok) throw new Error('深圳快照暂时不可用。');
-            const snapshot = (await snapshotResponse.json()) as ScanResult;
-            setResult(snapshot);
-            setStatus('ready');
-            setMessage(
-              snapshot.aircraft.length
-                ? `深圳附近有 ${snapshot.aircraft.length} 架飞机（定时快照）`
-                : '深圳 35 公里内暂时没有收到飞机信号',
-            );
-            return snapshot;
+            return await readShenzhenSnapshot();
           } catch {
             // Continue to the normal error state when no snapshot is available.
           }
