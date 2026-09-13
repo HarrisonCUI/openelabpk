@@ -1,1 +1,1 @@
-{"aircraft":[{"icao24":"789275","callsign":"CPA844","country":"China","longitude":113.9201,"latitude":22.3338,"altitude":281.94,"velocity":90.29,"track":71.05,"verticalRate":14.96,"category":0,"distance":27.243632720628273,"bearing":211.34846088852078}],"target":null,"prediction":null,"trackedFlight":null,"matchedCallsign":null,"timestamp":1789325155,"remaining":"399","source":"OpenSky · GitHub 深圳快照"}
+{"aircraft":[],"target":null,"prediction":null,"trackedFlight":null,"matchedCallsign":null,"timestamp":1789333718,"remaining":"399","source":"OpenSky · GitHub 深圳快照"}
